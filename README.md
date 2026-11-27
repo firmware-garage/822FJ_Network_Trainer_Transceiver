@@ -8,7 +8,7 @@ This firmware drives a GM Class 2 (J1850 VPW) instrument cluster's fuel, speed, 
 
 <img src="images/image_d01b4da9.jpg" alt="Block Diagram" width="500">
 
-## Schematic 
+## Transceiver Schematic 
 
 <img src="images/transceiver schematic.png" alt="Schematic" width="500">
 
