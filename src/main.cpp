@@ -41,10 +41,12 @@ extern uint8_t crc(uint8_t* msg_buf, int8_t nbytes);
 // DevKitC-1 N16R8 bring out. Avoided: 0/3/45/46 (strapping), 19/20 (native
 // USB), 26-32 (in-package flash/PSRAM), 33-37 (octal PSRAM on R8 parts),
 // 43/44 (UART0), 48 (RGB LED on many S3 boards).
-constexpr uint8_t PIN_VPW_RX  = 4;
-constexpr uint8_t PIN_VPW_TX  = 5;
-constexpr uint8_t PIN_ENC_A   = 6;
-constexpr uint8_t PIN_ENC_B   = 7;
+
+constexpr uint8_t PIN_VPW_RX  = 5;    //  These four values are
+constexpr uint8_t PIN_VPW_TX  = 4;    //  swapped on actual hardware
+constexpr uint8_t PIN_ENC_A   = 7;    //  These assignments fit
+constexpr uint8_t PIN_ENC_B   = 6;    //  better on my layout
+
 constexpr uint8_t PIN_SDA     = 8;    // also the S3 Arduino default SDA
 constexpr uint8_t PIN_SCL     = 9;    // also the S3 Arduino default SCL
 constexpr uint8_t PIN_ENC_BTN = 10;
