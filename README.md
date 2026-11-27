@@ -2,7 +2,11 @@
 
 This firmware drives a GM Class 2 (J1850 VPW) instrument cluster's fuel, speed, coolant temperature and PRNDL gauges from one rotary encoder. A 20x4 LCD on an I2C backpack at 0x27 shows each gauge's frame exactly as it went out on the bus. The classic ESP32 build is untouched in `../cluster_trainer`.
 
-**Status:** it compiles for real against the real VPW library, for both S3 boards, and 412 host tests pass. Nothing has run on hardware yet. Bus timing, arbitration and the LCD are all unproven until the bench checks at the end of this file.
+**Status:** Bench tests pass.  Still untested on the actual ATech 822FJ Instrument Panel Trainer.
+
+## Block Diagram
+
+<img src="images/image_d01b4da9.jpg" alt="Block Diagram" width="500">
 
 ## Schematic 
 
@@ -80,12 +84,6 @@ Source: github.com/firmware-garage/J1850VPW_Transceiver, classic ESP32 (`esp32de
 - **Register access:** the library uses only `digitalRead` and `digitalWrite`, never raw registers, so there's no GPIO_IN_REG or GPIO_IN1_REG issue in it. This sketch's own fast reads already pick GPIO_IN1_REG for pins 32 and up.
 - **Wi-Fi and web page:** not part of the cluster trainer. With Wi-Fi gone, so is the risk of flash writes stalling the flash-resident RX ISR.
 
-**Found in your repo, not fixed there (read-only):**
-
-- `src/main.cpp` doesn't compile as committed. It calls `esp_netif_*` without `#include "esp_netif.h"`, and fails on both Arduino core 2.0.17 and 3.3.12. With that one include added (in a scratch copy only), it builds on both.
-- The web page accepts up to 64 bytes, but the library copies them into a 12-byte static buffer and adds the CRC after them. Anything over 11 bytes overruns memory. The console `tx` command here caps input at 11 bytes.
-- The AP password `12345678` is in the public repo.
-
 ## Board and pins
 
 Default env `s3_supermini` targets an ESP32-S3 Super Mini (ESP32-S3FH4R2). Env `s3_n16r8` targets a DevKitC-1 N16R8. Both use the same pins, all from GPIO 1-13, which both boards bring out. **Check them against your board's silkscreen.** I couldn't confirm a Super Mini pinout from the maker.
@@ -100,7 +98,7 @@ Default env `s3_supermini` targets an ESP32-S3 Super Mini (ESP32-S3FH4R2). Env `
 
 Pins it avoids: 0, 3, 45 and 46 (strapping), 19 and 20 (USB), 26-37 (flash and PSRAM), 43 and 44 (UART0), and 48 (RGB LED). A `static_assert` refuses those pins if you remap.
 
-**The S3 is not 5 V tolerant.** Most PCF8574 backpacks pull SDA and SCL up to their own VCC. Either power the backpack from 3.3 V (contrast may need a tweak), or use a level shifter or remove the backpack's pull-ups. The same applies to your transceiver's RX output.
+**The S3 is not 5 V tolerant.** Most PCF8574 backpacks pull SDA and SCL up to their own VCC. Either power the backpack from 3.3 V (contrast may need a tweak), or use a level shifter or remove the backpack's pull-ups.  Backpack powered from 5v, using level shifter.
 
 Serial is the USB-C port (native USB CDC) at 115200. On the N16R8 board, use the port marked USB.
 
@@ -110,10 +108,10 @@ Each row is a marker column followed by the frame actually sent, CRC included, i
 
 ```
  col 0   1-6       7   8 ...     space  CRC
-  ' '    A88310        127A         B5        fuel   (15 columns)
+  ' '    A88310          127A       B5        fuel   (15 columns)
   ' '    882911        020000       3B        speed  (17 columns)
-  ' '    684910        104E         B5        temp   (100 F)
-  ' '    68EA10        0A01         AE        PRNDL  (P)
+  ' '    684910          104E       B5        temp   (100 F)
+  ' '    68EA10          0A01       AE        PRNDL  (P)
 ```
 
 The first group is priority, destination and source. Everything after the first space is data (message byte and value). The last group is the CRC. On the case, the priority/destination/source labels go under columns 1-6. Until a channel's first frame goes out, its row shows the frame about to be sent.
@@ -169,9 +167,9 @@ Not tested: anything on the board, the bus or the LCD. 18 us is validated on you
 
 ## Bench checks, in order
 
-1. **Boot without the bus connected.** The serial log shows `VPW arbitration check delay 18 us`, `CRC self-test PASS`, `LCD at 0x27` and `bus task on core 1, UI on core 0`. The LCD shows four rows of hex. If the LCD isn't found, the log lists the addresses that did answer.
-2. **Knob and states.** Press once: a blinking `>` appears. Turn: it moves between rows. Press again: it changes to the solid arrow and turning changes the hex. Press: back to blinking. Wait 10 s: markers disappear. Then type `stat` and look for `GPIO ISR core=0`.
-3. **Idle TX level.** With the transceiver connected but the cluster unplugged, the TX pin should sit HIGH. Put the scope on the bus while the board resets: there should be no active pulse during boot.
+1. ~~**Boot without the bus connected.** The serial log shows `VPW arbitration check delay 18 us`, `CRC self-test PASS`, `LCD at 0x27` and `bus task on core 1, UI on core 0`. The LCD shows four rows of hex. If the LCD isn't found, the log lists the addresses that did answer.~~
+2. ~~**Knob and states.** Press once: a blinking `>` appears. Turn: it moves between rows. Press again: it changes to the solid arrow and turning changes the hex. Press: back to blinking. Wait 10 s: markers disappear. Then type `stat` and look for `GPIO ISR core=0`.~~
+3. ~~**Idle TX level.** With the transceiver connected but the cluster unplugged, the TX pin should sit HIGH. Put the scope on the bus while the board resets: there should be no active pulse during boot.~~
 4. **Symbol timing.** Scope the bus while `hb on`. Short symbols should be 64 us (+/- about 15 is fine for receivers), long symbols 128 us, SOF 200 us, EOF 280 us or more. Do it again while spinning the knob and while `rx on` floods the console: the widths should not change.
 5. **Arbitration delay (18 us, from your validated build).** With only the trainer on the bus, `stat` should show `arbLost` staying at 0, as it did on the classic board. If it climbs on the S3 alone, the S3's `digitalRead` path or the 3.3 V RX level is behaving differently from the classic board. Scope TX against RX at a passive edge before you raise it.
 6. **Round trip.** Run the sniffer (or `rx on` on a second board) and check that each frame matches its LCD row byte for byte, CRC included.
